@@ -1,0 +1,113 @@
+# This is a basic workflow to help you get started with Actions
+name: Android CI and CD
+# Controls when the workflow will run
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+  repository-projects: write
+
+on:
+  # Triggers the workflow on push or pull request events but only for the "master" branch
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout
+        uses: actions/checkout@v4 #v4.1.1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4 #v4.0.0
+        with:
+          java-version: '17'
+          distribution: 'temurin' # 'adopt'
+
+      - name: Install Gradle if needed
+        run: |
+          sudo apt-get install -y gradle
+
+      - name: Initialize Gradle Wrapper if not exists
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            gradle wrapper
+          fi
+
+
+      - name: List contents of GitHub Actions workspace
+        run: ls ${{ github.workspace }}
+
+#      - name: Delete a workflow file from the repository
+#        run: rm .github/workflows/AndroidBuild.yml
+
+      - name: Move AndroidBuild.yml to the GitHub workspace directory and rename it as AndroidBuild.1.backup
+        run: mv .github/workflows/AndroidBuild.yml ${{ github.workspace }}/AndroidBuild.1.backup
+
+      - name: Move AndroidBuild.2.backup from GitHub workspace to .github/workflows and rename it as AndroidBuild.yml
+        run: mv ${{ github.workspace }}/AndroidBuild.2.backup .github/workflows/AndroidBuild.yml
+
+#      - name: Set set SSH
+#        run: mkdir -p ${{ github.workspace }}/.ssh
+
+#      - name: echo
+#        run: echo -en "${{ secrets.SSH_PRIVATE_KEY }}"; > ${{ github.workspace }}/.ssh/id_rsa
+
+#      - name: chmod 600
+#        run: chmod 600 ${{ github.workspace }}/.ssh/id_rsa
+
+#      - name: SSH KeyScan
+#        run: ssh-keyscan github.com >> ${{ github.workspace }}/.ssh/known_hosts
+
+#      - name: ssh-agent
+#        run: ssh-agent /usr/bin/bash
+
+#      - name: eval
+#        run: eval "$(ssh-agent -s)"
+
+#      - name: ssh-add
+#        run: ssh-add ${{ github.workspace }}/.ssh/id_rsa
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Clone with SSH
+        run: ssh -T git@github.com > /dev/null 2>&1 || true
+
+      - name: Show remote repositories (verbose)
+        run: git remote -v
+
+      - name: Set-URL
+        run: git remote set-url origin git@github.com:eucalypsih/AndroidCICD.git
+
+      - name: Show remote repositories (verbose)
+        run: git remote -v
+
+      - name: Set global Git username and email
+        run: git config --global user.name "github-actions[bot]" && git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: View all Git configuration
+        run: git config --list
+
+      - name: Stage all files in GitHub Actions workspace
+        run: git -C ${{ github.workspace }} add .
+
+      - name: Amend the last commit message
+        run: git commit -m "From CI/CD" --amend
+
+      - name: Push main to origin
+        run: git push origin main --force
+
